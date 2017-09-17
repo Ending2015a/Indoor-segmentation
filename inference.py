@@ -5,7 +5,7 @@ import os
 import sys
 import time
 import scipy.io as sio
-from PIL import Image
+import cv2
 
 import tensorflow as tf
 import numpy as np
@@ -20,12 +20,16 @@ INPUT_DIR = './input/'
 RESTORE_PATH = './restore_weights/'
 matfn = 'color150.mat'
 
-def get_arguments():
-    parser = argparse.ArgumentParser(description="Indoor segmentation parser.")
-    parser.add_argument("--img_path", type=str, default='',
-                        help="Path to the RGB image file.")
+flags = tf.app.flags
 
-    return parser.parse_args()
+flags.DEFINE_string('name', 'server', 'ID which will be used in log file')
+flags.DEFINE_integer('port', 8888, 'Server socket port')
+flags.DEFINE_string('logfile', './server.log', 'Log file')
+flags.DEFINE_integer('width', 640, 'Width of input image')
+flags.DEFINE_integer('height', 320, 'Height of input image')
+flags.DEFINE_integer('device', 0, 'GPU device')
+
+FLAGS = flags.FLAGS
 
 def read_labelcolours(matfn):
     mat = sio.loadmat(matfn)
@@ -35,55 +39,40 @@ def read_labelcolours(matfn):
 
     return color_list
 
-def decode_labels(mask, num_images=1, num_classes=150):
+def decode_labels(mask, num_classes=150):
     label_colours = read_labelcolours(matfn)
 
     n, h, w, c = mask.shape
     assert(n >= num_images), 'Batch size %d should be greater or equal than number of images to save %d.' % (n, num_images)
-    outputs = np.zeros((num_images, h, w, 3), dtype=np.uint8)
-    for i in range(num_images):
-      img = Image.new('RGB', (len(mask[i, 0]), len(mask[i])))
-      pixels = img.load()
-      for j_, j in enumerate(mask[i, :, :, 0]):
-          for k_, k in enumerate(j):
-              if k < num_classes:
-                  pixels[k_,j_] = label_colours[k]
-      outputs[i] = np.array(img)
-    return outputs
+    output = np.zeros((h, w, 3), dtype=np.uint8)
+
+    h, w, c = mask.shape
+
+    for i in range(h):
+        for j in range(w):
+            k = mask[i,j,1]
+            if k < num_classes:
+                output[i, j, 0:2] = label_colours[k, 2:0]
+
+    return output
+
+
 
 def load(saver, sess, ckpt_path):
     saver.restore(sess, ckpt_path)
     print("Restored model parameters from {}".format(ckpt_path))
 
-def main():
-    args = get_arguments()
-    filename = args.img_path
-    img_path = INPUT_DIR + args.img_path
+    
 
-    file_type = img_path.split('.')[-1]
+def main(argv=None):
 
-    if os.path.isfile(img_path):
-        print('successful load img: {0}'.format(args.img_path))
-    else:
-        print('not found file: {0}'.format(img_path))
-        sys.exit(0)
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(FLAGS.device)
 
-    # Prepare image.
-    if file_type.lower() == 'png':
-        img = tf.image.decode_png(tf.read_file(img_path), channels=3)
-    elif file_type.lower() == 'jpg':
-        img = tf.image.decode_jpeg(tf.read_file(img_path), channels=3)
-    else:
-        print('cannot process {0} file.'.format(file_type))
+    input_img = tf.placeholder(tf.float32, [1, FLAGS.height, FLAGS.width, 3])
 
-    # Convert RGB to BGR.
-    img_r, img_g, img_b = tf.split(axis=2, num_or_size_splits=3, value=img)
-    img = tf.cast(tf.concat(axis=2, values=[img_b, img_g, img_r]), dtype=tf.float32)
-    # Extract mean.
-    img -= IMG_MEAN
 
     # Create network.
-    net = DeepLabResNetModel({'data': tf.expand_dims(img, dim=0)}, is_training=False, num_classes=NUM_CLASSES)
+    net = DeepLabResNetModel({'data': input_img}, is_training=False, num_classes=NUM_CLASSES)
 
     # Which variables to load.
     restore_var = tf.global_variables()
@@ -113,17 +102,33 @@ def main():
         print('No checkpoint file found.')
         load_step = 0
 
-    # Perform inference.
-    preds = sess.run(pred)
 
-    msk = decode_labels(preds, num_classes=NUM_CLASSES)
-    im = Image.fromarray(msk[0])
-    if not os.path.exists(SAVE_DIR):
-        os.makedirs(SAVE_DIR)
-    im.save(SAVE_DIR + filename)
+    # create server
+    server = serverSOck(name=FLAGS.name)
+    server.create(port=FLAGS.port)
 
-    print('The output file has been saved to {0}'.format(SAVE_DIR + filename))
+    server.waitForClient()
 
+    while True:
+        print('wait for task')
+        img = server.recv()
+        img = cv2.imdecode('.jpg', img)
+        h, w, c = img.shape
+        img = cv2.resize(img, (FLAGS.width, FLAGS.height)).astype(float) - IMG_MEAN
+
+        img = np.expand_dims(img, axis=0)
+
+        preds = sess.run(pred, feed_dict={input_img: img})
+
+        msk = decode_labels(preds, numclasses=NUM_CLASSES)
+        
+        msk = cv2.resize(msk, (w, h))
+
+        msk = cv2.imencode('.jpg', msk)
+
+        server.send(msk)
+
+    server.close()
 
 if __name__ == '__main__':
-    main()
+    tf.app.run()
