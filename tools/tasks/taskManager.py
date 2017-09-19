@@ -29,6 +29,8 @@ class taskManager(object):
         reply = taskManager.dm.sendMsgToIdleDeviceAndWaitForReply(msg, True)
         return reply
 
+
+
     
     def closeDevice(self):
         taskManager.dm.closeAllDevices()

@@ -94,10 +94,9 @@ class Worker(th.Thread):
                 task.back = e
                 task.state = 2
             finally:
-                self.tasks.task_done()
                 if task.callback != None:
                     task.callback(task, task.back, task.state)
-
+                self.tasks.task_done()
 
     ###
     #   pause
