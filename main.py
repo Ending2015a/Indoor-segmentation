@@ -12,8 +12,6 @@ from tools.hqueue import hQueue
 
 devices = [
     ['Dory1', '140.114.75.144', 8888],
-    ['Dory2', '140.114.75.144', 8889],
-    ['Dory3', '140.114.75.144', 8890]
 ]
 
 result_queue = hQueue(capacity=30)
@@ -41,10 +39,10 @@ def get_from_queue():
     return seg
 
 def main():
-    tm = taskManager(num_threads=3, device_list=devices, log='device.log', name='tm')
+    tm = taskManager(num_threads=1, device_list=devices, log='device.log', name='tm')
 
 
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture('test_video.MOV')
 
     cur_time = datetime.now()
 
