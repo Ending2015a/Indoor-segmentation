@@ -10,8 +10,8 @@ from ..socket.clientSock import clientSock
 class taskManager(object):
     pool = None
     dm = None
-    def __init__(self, num_threads, capacity=-1, device_list=[], log=None, name=None):
-        taskManager.pool = ThreadPool(num_threads, capacity, log)
+    def __init__(self, num_threads, capacity=-1, throw=True, device_list=[], log=None, name=None):
+        taskManager.pool = ThreadPool(num_threads, capacity, throw, log)
         taskManager.dm = deviceManager(device_list, log=log)
 
         taskManager.dm.waitForConnections(5)

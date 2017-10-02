@@ -14,13 +14,13 @@ devices = [
     ['Dory1', '140.114.75.144', 8888],
 ]
 
-result_queue = hQueue(capacity=30)
+result_queue = hQueue(capacity=1, throw=True)
 
 img_path = './input'
 
 
 def task(img):
-    _, img_bytes = cv2.imencode('.jpg', img)
+    _, img_bytes = cv2.imencode('.png', img)
     img_bytes = img_bytes.tostring()
     seg = taskManager.sendTask(img_bytes)
     seg = np.fromstring(seg, np.uint8)
@@ -39,10 +39,10 @@ def get_from_queue():
     return seg
 
 def main():
-    tm = taskManager(num_threads=1, device_list=devices, log='device.log', name='tm')
+    tm = taskManager(num_threads=1, capacity=1, device_list=devices, log='device.log', name='tm')
 
 
-    cap = cv2.VideoCapture('test_video.MOV')
+    cap = cv2.VideoCapture(0)
 
     cur_time = datetime.now()
 
@@ -58,7 +58,7 @@ def main():
             time.sleep(0.033)
             continue
         
-        #result_queue.discard_lt((cur_time, None))
+        result_queue.discard_lt((cur_time, None))
         output = get_from_queue()
         print('fps = {0}'.format( 1/(time.time()-start) ))
         start = time.time()

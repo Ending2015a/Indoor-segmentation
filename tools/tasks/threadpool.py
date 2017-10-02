@@ -128,11 +128,13 @@ class ThreadPool:
     #   log: log file path
     #   name: ThreadPool ID in log file
     #
-    def __init__(self, num_threads, capacity=-1, log=None):
+    def __init__(self, num_threads, capacity=-1, throw=True, log=None):
         self.workers=[]
         if capacity == -1:
             capacity = num_threads * 3
+        self.capacity = capacity
         self.tasks = PriorityQueue(capacity)
+        self.throw = throw
 
         for n in range(num_threads):
             
@@ -145,6 +147,11 @@ class ThreadPool:
     #
     def add_task(self, priority, func, callback, *args, **kargs):
         task = lowLevelTask(func, callback, *args, **kargs)
+        if self.capacity > 0 and self.tasks.qsize() >= self.capacity:
+            if self.throw:
+                self.tasks.get()
+            else:
+                return None
         self.tasks.put((priority, task))
         return task
 

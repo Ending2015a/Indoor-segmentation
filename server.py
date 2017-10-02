@@ -14,7 +14,7 @@ from model import DeepLabResNetModel
 
 IMG_MEAN = np.array((104.00698793,116.66876762,122.67891434), dtype=np.float32)
 
-NUM_CLASSES = 150
+NUM_CLASSES = 27
 SAVE_DIR = './output/'
 INPUT_DIR = './input/'
 RESTORE_PATH = './restore_weights/'
@@ -26,7 +26,7 @@ flags.DEFINE_string('name', 'server', 'ID which will be used in log file')
 flags.DEFINE_integer('port', 8888, 'Server socket port')
 flags.DEFINE_string('logfile', './server.log', 'Log file')
 flags.DEFINE_integer('width', 640, 'Width of input image')
-flags.DEFINE_integer('height', 320, 'Height of input image')
+flags.DEFINE_integer('height', 480, 'Height of input image')
 flags.DEFINE_integer('device', 0, 'GPU device')
 
 FLAGS = flags.FLAGS
@@ -51,10 +51,9 @@ def decode_labels(mask, num_classes=150):
     for i in range(h):
         for j in range(w):
             k = mask[0][i][j][0]
-            if k < num_classes:
-                output[i][j][0] = label_colours[k][2]
-		output[i][j][1] = label_colours[k][1]
-		output[i][j][2] = label_colours[k][0]
+            output[i][j][0] = label_colours[k][2]
+            output[i][j][1] = label_colours[k][1]
+            output[i][j][2] = label_colours[k][0]
 
     return output
 
@@ -115,7 +114,7 @@ def main(argv=None):
         print('wait for task')
         img = server.recv()
         print('receive task')
-	img = np.fromstring(img, np.uint8)
+        img = np.fromstring(img, np.uint8)
         img = cv2.imdecode(img, 1)
         hi, wi, _ = img.shape
         img = cv2.resize(img, (FLAGS.width, FLAGS.height)).astype(float) - IMG_MEAN
@@ -128,9 +127,9 @@ def main(argv=None):
         
         msk = cv2.resize(msk, (wi, hi))
 
-        _, msk = cv2.imencode('.jpg', msk)
+        _, msk = cv2.imencode('.png', msk)
 
-	msk = msk.tostring()
+        msk = msk.tostring()
 
         server.send(msk)
         print('task done')

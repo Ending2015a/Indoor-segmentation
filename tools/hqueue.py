@@ -9,7 +9,7 @@ class hQueue(object):
     def push(self, item):
         if self.capacity > 0 and self.queue.qsize() >= self.capacity:
             if self.throw:
-                self.get()
+                self.queue.get()
             else:
                 return
         self.queue.put(item)
